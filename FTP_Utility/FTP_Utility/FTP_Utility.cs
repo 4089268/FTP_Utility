@@ -114,9 +114,8 @@ namespace FTP_Utility {
         }
 
         public static ResponseFTP<List<FTP_File>> ObtenerListadoArchivos(NetworkCredential credenciales, string ftpPath) {
-            var respuestaFTP = new ResponseFTP<List<FTP_File>>();
-
             Console.WriteLine("Obteniendo listado archivos");
+            var respuestaFTP = new ResponseFTP<List<FTP_File>>();
 
             try {
 
@@ -185,12 +184,11 @@ namespace FTP_Utility {
             return respuestaFTP;
         }
 
-        public static ResponseFTP<string> ActualizarCarpeta(NetworkCredential credenciales, string rutaCarpetaLocal, string rutaCarpetaFtp) {
-            var respuestaFTP = new ResponseFTP<string>();
-            Console.WriteLine("Actualizando Carpeta");
+        public static ResponseFTP<List<FTP_File>> ObtenerArchivosPendientes(NetworkCredential credenciales, string rutaCarpetaLocal, string rutaCarpetaFtp) {
+            Console.WriteLine("Obteniendo listado de archivos pendientes");
+            var respuestaFTP = new ResponseFTP<List<FTP_File>>();
 
-
-            //*** Obteniendo archivos en la carpeta FTP
+            //*** Obtner Listado de archivos en el FTP
             var tmpResp = ObtenerListadoArchivos(credenciales, rutaCarpetaFtp);
             if (tmpResp.Ok == 0) {
                 respuestaFTP.Message = "Error al obtener los archivos de la carpeta local: \n" + tmpResp.Message;
@@ -202,10 +200,8 @@ namespace FTP_Utility {
             //*** Obteniendo archivos en la carpeta Local
             FileInfo[] archivosLocales = null;
             try {
-                //var xD = new DirectoryInfo(@rutaCarpetaLocal);
                 var xD = new DirectoryInfo(rutaCarpetaLocal);
                 archivosLocales = xD.GetFiles();
-
             }
             catch (Exception err) {
                 respuestaFTP.Message = "Error al obtener archivos locales: " + err.Message + " \n" + err.StackTrace;
@@ -214,30 +210,49 @@ namespace FTP_Utility {
 
 
             //*** Compara Archivos y generar Lista de Archivos a subir
-            List<string> archivosPorSubir = new List<string>();
+            List<FTP_File> archivosPorSubir = new List<FTP_File>();
             foreach (var itemLocal in archivosLocales) {
-                bool encontrado = false;
+                bool omitir = false;
                 foreach (var itemFtp in listaArchivosFTP) {
                     if (itemFtp.Nombre.ToLower() == itemLocal.Name.ToLower()) {
-                        encontrado = true;
+                        if (itemFtp.Tamaño >= itemLocal.Length) {
+                            omitir = true;
+                        }
                     }
                 }
-
-                if (!encontrado) {
-                    archivosPorSubir.Add(itemLocal.Name);
+                if (!omitir) {
+                    archivosPorSubir.Add( new FTP_File { 
+                        Nombre = itemLocal.Name ,
+                        Tamaño = itemLocal.Length,
+                        UltimaModif = itemLocal.LastWriteTime
+                    });
                 }
             }
-            if (archivosPorSubir.Count <= 0) {
-                respuestaFTP.Data = "Ningun archivo pendiente por subir";
-            }
+            respuestaFTP.Ok = 1;
+            respuestaFTP.Data = archivosPorSubir;
 
+            return respuestaFTP;
+        }
+
+        public static ResponseFTP<string> ActualizarCarpeta(NetworkCredential credenciales, string rutaCarpetaLocal, string rutaCarpetaFtp) {
+            var respuestaFTP = new ResponseFTP<string>();
+            Console.WriteLine("Actualizando Carpeta");
+
+
+            //*** Obteniendo archivos en la carpeta FTP
+            var tmpResp = ObtenerArchivosPendientes(credenciales, rutaCarpetaLocal, rutaCarpetaFtp);
+            if (tmpResp.Ok == 0) {
+                respuestaFTP.Message = tmpResp.Message;
+                return respuestaFTP;
+            }
+            List<FTP_File> archivosPendientes= tmpResp.Data;
 
             //*** Subir Archivos
-            foreach (var itemPorSubir in archivosPorSubir) {
+            foreach (var itemPorSubir in archivosPendientes) {
 
                 //*** Si el ultimo caracter de la rutaCarpetaLocal es un '/' or un '\', combinar la rutaCarpetaLocal y el nombre del archivo sin agregar el '/'
-                var tmpURl = (rutaCarpetaLocal.ToCharArray()[rutaCarpetaLocal.Length - 1] == '/' || rutaCarpetaLocal.ToCharArray()[rutaCarpetaLocal.Length - 1] == '\\') ? $"{rutaCarpetaLocal}{itemPorSubir}" : $"{rutaCarpetaLocal}/{itemPorSubir}";
-                var tmpURlFTp = (rutaCarpetaFtp.ToCharArray()[rutaCarpetaFtp.Length - 1] == '/' || rutaCarpetaFtp.ToCharArray()[rutaCarpetaFtp.Length - 1] == '\\') ? $"{rutaCarpetaFtp}{itemPorSubir}" : $"{rutaCarpetaFtp}/{itemPorSubir}";
+                var tmpURl = (rutaCarpetaLocal.ToCharArray()[rutaCarpetaLocal.Length - 1] == '/' || rutaCarpetaLocal.ToCharArray()[rutaCarpetaLocal.Length - 1] == '\\') ? $"{rutaCarpetaLocal}{itemPorSubir.Nombre}" : $"{rutaCarpetaLocal}/{itemPorSubir.Nombre}";
+                var tmpURlFTp = (rutaCarpetaFtp.ToCharArray()[rutaCarpetaFtp.Length - 1] == '/' || rutaCarpetaFtp.ToCharArray()[rutaCarpetaFtp.Length - 1] == '\\') ? $"{rutaCarpetaFtp}{itemPorSubir.Nombre}" : $"{rutaCarpetaFtp}/{itemPorSubir.Nombre}";
                 Console.WriteLine($"\tSubiendo Archivo: {tmpURl} a {tmpURlFTp} ");
 
                 var tmpRes = FTP_Utility.SubirArchivo(credenciales, tmpURl, tmpURlFTp, ModoPublicacion.SobreEscribir);
@@ -252,5 +267,6 @@ namespace FTP_Utility {
             }
             return respuestaFTP;
         }
+        
     }
 }

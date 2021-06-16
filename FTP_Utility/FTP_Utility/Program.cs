@@ -10,8 +10,8 @@ namespace FTP_Utility {
         static void Main(string[] args) {
             Console.WriteLine("FTP Utility");
             NetworkCredential credenciales = new NetworkCredential {
-                UserName = "{Mi Usuario}",
-                Password = "{Mi contraseña}"
+                UserName = "{Usuario}",
+                Password = "{Contraseña}"
             };
             //Ruta ftp: ftp://host.net:21
 
@@ -20,6 +20,7 @@ namespace FTP_Utility {
                 Console.WriteLine(" -u <Archivo Origen> <Archivo Destino> \t Sube un archivo");
                 Console.WriteLine(" -ls <Ruta destino> \t Obtiene el listado de los archivos en la ruta establecida");
                 Console.WriteLine(" -uf <Ruta carpta local> <Ruta carpta destino> \t Sube los archivos de la carpeta local que no esten en la carpeta destino");
+                Console.WriteLine(" -lsu <Ruta carpta local> <Ruta carpta destino> \t Optiene los archivos por subir, comparando la carpeta local y la carpeta destino");
                 Console.WriteLine(" -w <Ruta carpta local> <Ruta carpta destino> \t Detecta cambios y sube los archivos de la carpeta local que no esten en la carpeta destino");
                 return;
             }
@@ -53,10 +54,16 @@ namespace FTP_Utility {
                     }
                     r1 = args[1];
                     var resp3 = FTP_Utility.ObtenerListadoArchivos(credenciales, r1);
-                    foreach(var item in resp3.Data) {
-                        Console.WriteLine($"\tArchivo: {item.Nombre}");
+                    if (resp3.Ok==1) {
+                        foreach (var item in resp3.Data) {
+                            Console.WriteLine($"\tArchivo: {item.Nombre}\tBytes: {item.Tamaño}");
+                        }                        
+                    }
+                    else {
+                        Console.WriteLine("Error al obtener los archivos.\n\t"+resp3.Message);
                     }
                     break;
+
 
 
                 case "-uf":
@@ -68,6 +75,30 @@ namespace FTP_Utility {
                     var r42 = args[2];
                     var resp4 = FTP_Utility.ActualizarCarpeta(credenciales, r41,r42);
                     Console.WriteLine($"\nFinalizado:\nOk:\t{resp4.Ok}\nResp:\t{resp4.Data}\nMsg:\t{resp4.Message}");
+                    break;
+
+
+                case "-lsu":
+                    if (args.Length < 3) {
+                        Console.WriteLine("Faltan parametros");
+                        return;
+                    }
+                    var r61 = args[1];
+                    var r62 = args[2];
+                    var resp6 = FTP_Utility.ObtenerArchivosPendientes(credenciales, r61, r62);
+                    if(resp6.Ok == 1) {
+                        if(resp6.Data.Count > 0) {
+                            foreach (var item in resp6.Data) {
+                                Console.WriteLine($"\tArchivo: {item.Nombre}\tBytes: {item.Tamaño}");
+                            }
+                        }
+                        else {
+                            Console.WriteLine($"\nNo hay archivos pendientes por subir");
+                        }
+                    }
+                    else {
+                        Console.WriteLine($"\nError:\n\t{resp6.Message}");
+                    }                    
                     break;
 
 
