@@ -265,6 +265,7 @@ namespace FTP_Utility {
 
                 respuestaFTP.Data = "Comletado todos los archivos pendientes por subir";
             }
+            respuestaFTP.Ok = 1;
             return respuestaFTP;
         }
         
